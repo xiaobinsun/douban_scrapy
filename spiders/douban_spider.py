@@ -1,10 +1,16 @@
+import logging
 import re
 import threading
 import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
 
-from .. items import MovieTV, Celebrity
+from ..items import MovieTV, Celebrity
+from ..settings import LOGGING
+
+logging.config.dictConfig(LOGGING)
+
+logger = logging.getLogger('douban')
 
 class DoubanSpider(scrapy.Spider):
     name = "Douban"
@@ -18,25 +24,37 @@ class DoubanSpider(scrapy.Spider):
         url = '/'.join([baseurl, 'subject', str(sid)])
         url += '/'
 
+        return scrapy.Request(url=url, callback=self.parse_subject)
+        '''
+        return SplashRequest(url=url, callback=self.parse_subject,
+                            endpoint='render.html',
+                            args={'wait': 0.5})
+        '''
+
+    def subject_url_to_request(self, url):
+        return scrapy.Request(url=url, callback=self.parse_subject)
+        '''
         return SplashRequest(url=url, callback=self.parse_subject,
                             endpoint='render.html',
                             args={'wait': 0.5})
 
-    def subject_url_to_request(self, url):
-        return SplashRequest(url=url, callback=self.parse_subject,
-                            endpoint='render.html',
-                            args={'wait': 0.5})
+        '''
 
     def cid_to_request(self, cid, cb_kwargs):
         baseurl = 'https://movie.douban.com'
         url = '/'.join([baseurl, 'celebrity', cid])
         url += '/'
 
+        logger.debug('retrieving celebrity: %s', cid)
+        return scrapy.Request(url=url, callback=self.parse_celebrity,
+                                priority=100, cb_kwargs=cb_kwargs)
+        '''
         return SplashRequest(url=url, callback=self.parse_celebrity,
                               priority=100,
                               cb_kwargs=cb_kwargs,
                               endpoint='render.html',
                               args={'wait': 0.5})
+        '''
 
     def url_to_sid(self, url):
         m = self.re.match(url)
@@ -58,31 +76,37 @@ class MTSubjectSpider(DoubanSpider):
                             args={'wait': 0.5})
 
         for sid in self.seeds:
+            logger.debug('From seed, Retrieving subject: %s', sid)
             yield self.sid_to_request(sid)
 
     def parse_startpage(self, response):
         # 正在热映
         for url in response.css('.article .title a::attr(href)').getall():
             sid = self.url_to_sid(url)
-            if not self._sid_retrived(sid):
+            if not self._sid_retrieved(sid):
                 self.seeds.add(sid)
+                logger.debug('From startpage, Retrieving subject: %s', sid)
                 yield self.sid_to_request(sid)
 
         # 最近热门电影/电视剧
         for url in response.css('.list-wp .item::attr(href)').getall():
             sid = self.url_to_sid(url)
-            if not self._sid_retrived(sid):
+            if not self._sid_retrieved(sid):
                 self.seeds.add(sid)
+                logger.debug('From startpage, Retrieving subject: %s', sid)
                 yield self.sid_to_request(sid)
 
     def parse_subject(self, response):
         sid = self.url_to_sid(response.url)
 
         # retrieve subject data
-        if not self._sid_retrived(sid):
+        if not self._sid_retrieved(sid):
             directors = {}
             actors = {}
             scriptwriters = {}
+
+            logger.debug('subject(%s): start parsing...', sid)
+
             path = ('//div[@id="info"]/span[span]/span[text()="{}"]'
                         '/following-sibling::span/a/@href')
             title = response.css('#content h1 span::text').get()
@@ -100,6 +124,8 @@ class MTSubjectSpider(DoubanSpider):
                 rstr = [s[0:10] for s in rstr]
                 rstr.sort()
                 release_date = rstr[0]
+                if len(release_date) != 10:
+                    release_date = None
 
             tp = response.xpath('//div[@id="info"]/span[text()="集数:"]').get()
             if tp is None:
@@ -171,21 +197,29 @@ class MTSubjectSpider(DoubanSpider):
 
             # yield here if no need to retrieve celebrity
             if yield_now:
+                logger.debug('subject(%s): no need to retrieve celebrity, yield now',
+                                sid)
                 yield item
+
+        else:
+            logger.debug('subject(%s) already retrieved, skip parsing', sid)
 
         try:
             self.seeds.remove(sid)
         except KeyError:
             pass
+
         # retrieve links
         for url in response.xpath('//div[@class="recommendations-bd"]'
                                         '/*/dd/a/@href').getall():
             sid = self.url_to_sid(url)
-            if not self._sid_retrived(sid):
+            if not self._sid_retrieved(sid):
                 self.seeds.add(sid)
                 yield self.subject_url_to_request(url)
 
     def parse_celebrity(self, response, item, cid):
+        logger.debug('celebrity(%s): start parsing...', cid)
+
         path = (r'//div[@class="info"]/ul/li/span[text()="{}"]'
                     '/following-sibling::text()')
 
@@ -219,10 +253,12 @@ class MTSubjectSpider(DoubanSpider):
         if False not in item['di'].values() and \
             False not in item['sw'].values() and \
             False not in item['act'].values():
+            logger.debug('subject(%s): all celebrity retrieved, yield item now',
+                            item['sid'])
             yield item
 
-    def _sid_retrived(self, sid):
-        query = 'select * from movie_tv where id = "{}"'
+    def _sid_retrieved(self, sid):
+        query = 'select * from movie_tv where id = "%s"'
         if self.db_cur.execute(query.format(sid)):
             return True
         return False
@@ -232,15 +268,14 @@ class MTSubjectSpider(DoubanSpider):
             return False
 
         m = self.cre.match(href)
-        sid = m.group(1)
-        out.append(sid)
+        cid = m.group(1)
+        out.append(cid)
 
         query = 'select * from celebrity where id = "{}"'
-        if self.db_cur.execute(query.format(sid)):
+        if self.db_cur.execute(query.format(cid)):
             return False
 
         return True
-
 
 class ScoreSpider(DoubanSpider):
     name = "ScoreSpider"
@@ -250,7 +285,37 @@ class ScoreSpider(DoubanSpider):
                  'where datediff(curdate(), release_date) < 500')
         self.db_cur.execute(query)
         for sid in self.db_cur.fetchall():
-            yield self.sid_to_request(sid)
+            yield self.sid_to_request(sid[0])
 
     def parse_subject(self, response):
-        pass
+        sid = self.url_to_sid(response.url)
+
+        score = score_num = None
+        score_5 = score_4 = score_3 = score_2 = score_1 = None
+        score = response.xpath('//strong[@class="ll rating_num"]/text()').get()
+        if score is not None:
+            score_num = response.xpath('//a[@class="rating_people"]/span/text()').get()
+            score_5 = response.xpath('//span[@class="stars5 starstop"]'
+                                     '/following-sibling::span/text()').get()
+            score_5 = score_5.rstrip('%')
+
+            score_4 = response.xpath('//span[@class="stars4 starstop"]'
+                                         '/following-sibling::span/text()').get()
+            score_4 = score_4.rstrip('%')
+
+            score_3 = response.xpath('//span[@class="stars3 starstop"]'
+                                         '/following-sibling::span/text()').get()
+            score_3 = score_3.rstrip('%')
+
+            score_2 = response.xpath('//span[@class="stars2 starstop"]'
+                                         '/following-sibling::span/text()').get()
+            score_2 = score_2.rstrip('%')
+
+            score_1 = response.xpath('//span[@class="stars1 starstop"]'
+                                         '/following-sibling::span/text()').get()
+            score_1 = score_1.rstrip('%')
+
+        yield Score(sid=sid, score_num=score_num, score=score,
+                    score_5=score_5, score_4=score_4,
+                    score_3=score_3, score_2=score_2,
+                    score_1=score_1)

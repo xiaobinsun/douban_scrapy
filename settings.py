@@ -14,7 +14,6 @@ BOT_NAME = 'douban'
 SPIDER_MODULES = ['douban.spiders']
 NEWSPIDER_MODULE = 'douban.spiders'
 
-
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'douban (+http://www.yourdomain.com)'
 
@@ -27,7 +26,7 @@ ROBOTSTXT_OBEY = False
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 2
+DOWNLOAD_DELAY = 2.5
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
@@ -95,10 +94,10 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 2.0
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 # MYSQL
-#MYSQL_DB_NAME = ''
-#MYSQL_HOST = ''
-#MYSQL_USER = ''
-#MYSQL_PASSWORD = ''
+MYSQL_DB_NAME = ''
+MYSQL_HOST = ''
+MYSQL_USER = ''
+MYSQL_PASSWORD = ''
 
 # scrapy-splash
 SPLASH_URL = 'http://localhost:8050/'
@@ -112,3 +111,39 @@ DOWNLOADER_MIDDLEWARES.update({
 #    'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware': None,
 })
 ROTATING_PROXY_LIST_PATH = 'spiders/proxy_list.txt'
+
+# logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(levelname)s %(asctime)s %(message)s',
+        },
+    },
+    'handlers': {
+        'doubanlog': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'formatter': 'simple',
+            'filename': 'douban.log',
+        },
+        'scrapylog': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'formatter': 'simple',
+            'filename': 'scrapy.log',
+        },
+    },
+    'loggers': {
+        'douban': {
+            'level': 'DEBUG',
+            'propagate': False,
+            'handlers': ['doubanlog'],
+        },
+    },
+    'root': {
+        'level': 'DEBUG',
+        'handlers': ['scrapylog']
+    },
+}

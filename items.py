@@ -30,3 +30,13 @@ class MovieTV(scrapy.Item):
     score_3 = scrapy.Field()
     score_2 = scrapy.Field()
     score_1 = scrapy.Field()
+
+class Score(scrapy.Item):
+    sid = scrapy.Field()
+    score_num = scrapy.Field()
+    score = scrapy.Field()
+    score_5 = scrapy.Field()
+    score_4 = scrapy.Field()
+    score_3 = scrapy.Field()
+    score_2 = scrapy.Field()
+    score_1 = scrapy.Field()

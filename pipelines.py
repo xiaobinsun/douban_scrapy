@@ -5,18 +5,25 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
+import logging
 import datetime
 import pymysql
 
-from . spiders.douban_spider import MTSubjectSpider
-from . items import Celebrity, MovieTV
+from scrapy.exceptions import DropItem
+
+from .spiders.douban_spider import MTSubjectSpider
+from .items import Celebrity, MovieTV, Score
+
+logger = logging.getLogger('douban')
 
 class MysqlPipeline(object):
     def process_item(self, item, spider):
         if isinstance(item, Celebrity):
             if item['name'] is None:
+                logger.warning('drop celebrity(%s)', item['cid'])
                 raise DropItem
 
+            logger.debug('insert celebrity(%s) into db', item['cid'])
             if item['gender'] is None:
                 item['gender'] = 'NULL'
             if item['birth_date'] is None:
@@ -29,7 +36,10 @@ class MysqlPipeline(object):
                                              item['death_date']))
         elif isinstance(item, MovieTV):
             if item['title'] is None:
+                logger.warning('drop subject(%s)', item['sid'])
                 raise DropItem
+
+            logger.debug('insert subject(%s) into db', item['sid'])
 
             if item['region'] is None:
                 item['region'] = 'NULL'
@@ -59,9 +69,12 @@ class MysqlPipeline(object):
                                         item['score_5'], item['score_4'],
                                         item['score_3'], item['score_2'],
                                         item['score_1']))
+            elif isinstance(item, Score):
+                query = 'select score_date from score where id = "{}"'
+                r = self.db_cur.execute(query.format(item['sid']))
 
-            self.db_conn.commit()
-            raise DropItem
+
+        self.db_conn.commit()
 
     def open_spider(self, spider):
         db = spider.settings.get('MYSQL_DB_NAME', 'douban_scrapy')
