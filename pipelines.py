@@ -14,7 +14,7 @@ from scrapy.exceptions import DropItem
 from .spiders.douban_spider import MTSubjectSpider
 from .items import Celebrity, MovieTV, Score
 
-logger = logging.getLogger('douban')
+logger = logging.getLogger('douban.' + __name__)
 
 class MysqlPipeline(object):
     def process_item(self, item, spider):

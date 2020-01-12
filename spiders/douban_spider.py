@@ -10,7 +10,7 @@ from ..settings import LOGGING
 
 logging.config.dictConfig(LOGGING)
 
-logger = logging.getLogger('douban')
+logger = logging.getLogger('douban.' + __name__)
 
 class DoubanSpider(scrapy.Spider):
     name = "Douban"
