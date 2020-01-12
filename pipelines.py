@@ -168,11 +168,7 @@ class MysqlPipeline(object):
                 spider.seeds.add(s[0])
 
         # check events
-        self.db_cur.execute('show events')
-        events = self.db_cur.fetchall()
-        event_names = [t[0] for t in events]
-
-        if 'eliminate_score' not in event_names:
+        if not self.db_cur.execute('show events like \'eliminate_score\''):
             ''' update score table according to the release date(rd)
 
             1. rd < 30days: record for every day
