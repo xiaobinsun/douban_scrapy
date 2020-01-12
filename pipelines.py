@@ -69,10 +69,16 @@ class MysqlPipeline(object):
                                         item['score_5'], item['score_4'],
                                         item['score_3'], item['score_2'],
                                         item['score_1']))
-            elif isinstance(item, Score):
-                query = 'select score_date from score where id = "{}"'
-                r = self.db_cur.execute(query.format(item['sid']))
-
+        elif isinstance(item, Score):
+            query = ('replace into score values'
+                        '("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}")')
+            self.db_cur.execute(query.format(
+                                        item['sid'],
+                                        datetime.date.today(),
+                                        item['score'], item['score_num'],
+                                        item['score_5'], item['score_4'],
+                                        item['score_3'], item['score_2'],
+                                        item['score_1']))
 
         self.db_conn.commit()
 
@@ -160,6 +166,44 @@ class MysqlPipeline(object):
             self.db_cur.execute(query)
             for s in self.db_cur.fetchall():
                 spider.seeds.add(s[0])
+
+        # check events
+        self.db_cur.execute('show events')
+        events = self.db_cur.fetchall()
+        event_names = [t[0] for t in events]
+
+        if 'eliminate_score' not in event_names:
+            ''' update score table according to the release date(rd)
+
+            1. rd < 30days: record for every day
+            2. rd < 60days: record for every 2 days
+            3. rd < 120days: record for every 3 days
+            4. rd < 250days: record for every 5 days
+            5. rd < 500days: record for every 15 days
+            6. rd < 700days: record for every 25 days
+            7. rd > 700days: record only once
+            '''
+            query = ('create event eliminate_score '
+                'on schedule every 1 day '
+                'do '
+                'delete from score s '
+                'where 1 != '
+                '(select rid from '
+                    '(select s.*, row_number() over '
+                        '(partition by id, floor(dayofyear(score_date)/'
+                            '(case when datediff(curdate(), m.release_date) <= 60 then 2 '
+                                  'when datediff(curdate(), m.release_date) <= 120 then 3 '
+                                  'when datediff(curdate(), m.release_date) <= 250 then 5 '
+                                  'when datediff(curdate(), m.release_date) <= 500 then 15 '
+                                  'when datediff(curdate(), m.release_date) <= 700 then 25 '
+                                  'else 367 '
+                            'end)) order by score_date desc) rid '
+                    'from score s natural join movie_tv m '
+                    'where m.release_date is not NULL and '
+                        'datediff(curdate(), m.release_date) > 30) t '
+                'where s.id = t.id and s.score_date = t.score_date)'
+            )
+            self.db_cur.execute(query)
 
         spider.db_cur = self.db_cur
 

@@ -282,7 +282,7 @@ class ScoreSpider(DoubanSpider):
 
     def start_requests(self):
         query = ('select id from movie_tv'
-                 'where datediff(curdate(), release_date) < 500')
+                 'where datediff(curdate(), release_date) < 700')
         self.db_cur.execute(query)
         for sid in self.db_cur.fetchall():
             yield self.sid_to_request(sid[0])
