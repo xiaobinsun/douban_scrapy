@@ -169,7 +169,7 @@ class MysqlPipeline(object):
             query = 'select sid from seed where stype = "movie_tv"'
             self.db_cur.execute(query)
             for s in self.db_cur.fetchall():
-                spider.seeds.add(s[0])
+                spider.seeds.add(str(s[0]))
 
         # check events
         if not self.db_cur.execute('show events like \'eliminate_score\''):

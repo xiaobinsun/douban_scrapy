@@ -205,7 +205,7 @@ class MTSubjectSpider(DoubanSpider):
             logger.debug('subject(%s) already retrieved, skip parsing', sid)
 
         try:
-            self.seeds.remove(int(sid))
+            self.seeds.remove(sid)
         except KeyError:
             pass
 
