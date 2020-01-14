@@ -70,6 +70,10 @@ class MysqlPipeline(object):
                                         item['score_3'], item['score_2'],
                                         item['score_1']))
         elif isinstance(item, Score):
+            if item['score'] is None:
+                logger.warning('drop score(%s)', item['sid'])
+                raise DropItem
+
             query = ('replace into score values'
                         '("{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}", "{}")')
             self.db_cur.execute(query.format(

@@ -5,7 +5,7 @@ import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
 
-from ..items import MovieTV, Celebrity
+from ..items import MovieTV, Celebrity, Score
 from ..settings import LOGGING
 
 logging.config.dictConfig(LOGGING)
@@ -205,7 +205,7 @@ class MTSubjectSpider(DoubanSpider):
             logger.debug('subject(%s) already retrieved, skip parsing', sid)
 
         try:
-            self.seeds.remove(sid)
+            self.seeds.remove(int(sid))
         except KeyError:
             pass
 
@@ -281,8 +281,9 @@ class ScoreSpider(DoubanSpider):
     name = "ScoreSpider"
 
     def start_requests(self):
-        query = ('select id from movie_tv'
-                 'where datediff(curdate(), release_date) < 700')
+        query = ('select id from movie_tv '
+                 'where release_date is not NULL and '
+                 'datediff(curdate(), release_date) < 700')
         self.db_cur.execute(query)
         for sid in self.db_cur.fetchall():
             yield self.sid_to_request(sid[0])
