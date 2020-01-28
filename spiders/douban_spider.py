@@ -5,7 +5,7 @@ import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
 
-from douban.items import MovieTV, Celebrity, Score
+from douban.items import MovieTV, Celebrity, Score, Tag
 from douban.settings import LOGGING
 
 logging.config.dictConfig(LOGGING)
@@ -158,11 +158,14 @@ class MTSubjectSpider(DoubanSpider):
                                      '/following-sibling::span/text()').get()
                 score_1 = score_1.rstrip('%')
 
+            # tags
+            tl = [t for t in response.xpath('//div[@class="tags-body"]/a/text()').getall()]
+
             item = MovieTV(sid=sid, title=title, di=directors, sw=scriptwriters,
                           act=actors, region=region, rdate=release_date, tp=tp,
                           score_num=score_num, score=score, score_5=score_5,
                           score_4=score_4, score_3=score_3, score_2=score_2,
-                          score_1=score_1)
+                          score_1=score_1, tags=tl)
 
             yield_now = True
             for href in response.xpath(path.format('导演')).getall():
@@ -276,6 +279,25 @@ class MTSubjectSpider(DoubanSpider):
             return False
 
         return True
+
+class TagSpider(DoubanSpider):
+    name = 'TagSpider'
+
+    def start_requests(self):
+        query = ('select id from movie_tv m '
+                 'where not exists '
+                 '(select * from tag t where m.id = t.id)')
+        self.db_cur.execute(query)
+        for sid in self.db_cur.fetchall():
+            yield self.sid_to_request(sid[0])
+
+    def parse_subject(self, response):
+        sid = self.url_to_sid(response.url)
+
+        tl = [t for t in
+                response.xpath('//div[@class="tags-body"]/a/text()').getall()]
+        yield Tag(sid=sid, tags=tl)
+
 
 class ScoreSpider(DoubanSpider):
     name = "ScoreSpider"

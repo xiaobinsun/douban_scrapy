@@ -12,7 +12,7 @@ import pymysql
 from scrapy.exceptions import DropItem
 
 from .spiders.douban_spider import MTSubjectSpider
-from .items import Celebrity, MovieTV, Score
+from .items import Celebrity, MovieTV, Score, Tag
 
 logger = logging.getLogger('douban.' + __name__)
 
@@ -69,6 +69,15 @@ class MysqlPipeline(object):
                                         item['score_5'], item['score_4'],
                                         item['score_3'], item['score_2'],
                                         item['score_1']))
+
+            if len(item['tags']) > 0:
+                query = 'insert into tag values'
+                for t in item['tags']:
+                    query += '("{}", "{}"),'.format(item['sid'], t)
+
+                query = query.rstrip(',')
+                self.db_cur.execute(query)
+
         elif isinstance(item, Score):
             if item['score'] is None:
                 logger.warning('drop score(%s)', item['sid'])
@@ -83,6 +92,17 @@ class MysqlPipeline(object):
                                         item['score_5'], item['score_4'],
                                         item['score_3'], item['score_2'],
                                         item['score_1']))
+        elif isinstance(item, Tag):
+            if len(item['tags']) == 0:
+                logger.warning('drop Tag(%s)', item['sid'])
+                raise DropItem
+
+            query = 'insert into tag values'
+            for t in item['tags']:
+                query += '("{}", "{}"),'.format(item['sid'], t)
+
+            query = query.rstrip(',')
+            self.db_cur.execute(query)
 
         self.db_conn.commit()
 
@@ -156,6 +176,15 @@ class MysqlPipeline(object):
         )
         if 'participant' not in tb_names:
             self.db_cur.execute(tbl_participant)
+
+        tbl_tag = ('create table tag('
+                    'id int not null,'
+                    'tag varchar(15) not null,'
+                    'primary key(id, tag),'
+                    'foreign key(id) references movie_tv(id) on delete cascade,'
+                    'index(tag))')
+        if 'tag' not in tb_names:
+            self.db_cur.execute(tbl_tag)
 
         tbl_seed = ('create table seed('
                     'sid int not null,'
