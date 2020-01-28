@@ -5,8 +5,8 @@ import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
 
-from ..items import MovieTV, Celebrity, Score
-from ..settings import LOGGING
+from douban.items import MovieTV, Celebrity, Score
+from douban.settings import LOGGING
 
 logging.config.dictConfig(LOGGING)
 
