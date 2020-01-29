@@ -4,6 +4,7 @@ import threading
 import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
+from scrapy.exceptions import CloseSpider
 
 from douban.items import MovieTV, Celebrity, Score, Tag
 from douban.settings import LOGGING
@@ -97,6 +98,10 @@ class MTSubjectSpider(DoubanSpider):
                 yield self.sid_to_request(sid)
 
     def parse_subject(self, response):
+        if response.status == 403:
+            logger.error('403 received, abort')
+            raise CloseSpider('403 received')
+
         sid = self.url_to_sid(response.url)
 
         # retrieve subject data
@@ -221,6 +226,10 @@ class MTSubjectSpider(DoubanSpider):
                 yield self.subject_url_to_request(url)
 
     def parse_celebrity(self, response, item, cid):
+        if response.status == 403:
+            logger.error('403 received, abort')
+            raise CloseSpider('403 received')
+
         logger.debug('celebrity(%s): start parsing...', cid)
 
         path = (r'//div[@class="info"]/ul/li/span[text()="{}"]'
@@ -292,6 +301,10 @@ class TagSpider(DoubanSpider):
             yield self.sid_to_request(sid[0])
 
     def parse_subject(self, response):
+        if response.status == 403:
+            logger.error('403 received, abort')
+            raise CloseSpider('403 received')
+
         sid = self.url_to_sid(response.url)
 
         tl = [t for t in
@@ -311,6 +324,10 @@ class ScoreSpider(DoubanSpider):
             yield self.sid_to_request(sid[0])
 
     def parse_subject(self, response):
+        if response.status == 403:
+            logger.error('403 received, abort')
+            raise CloseSpider('403 received')
+
         sid = self.url_to_sid(response.url)
 
         score = score_num = None

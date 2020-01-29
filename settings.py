@@ -37,6 +37,9 @@ COOKIES_ENABLED = False
 # Disable Telnet Console (enabled by default)
 #TELNETCONSOLE_ENABLED = False
 
+# Process 403 code
+HTTPERROR_ALLOWED_CODES = [403]
+
 # Override the default request headers:
 #DEFAULT_REQUEST_HEADERS = {
 #   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -60,7 +63,6 @@ DOWNLOADER_MIDDLEWARES = {
 #    'douban.middlewares.DoubanDownloaderMiddleware': 543,
 }
 
-CLOSESPIDER_PAGECOUNT = 2000
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
 #EXTENSIONS = {
