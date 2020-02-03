@@ -175,33 +175,36 @@ class MTSubjectSpider(DoubanSpider):
             yield_now = True
             for href in response.xpath(path.format('导演')).getall():
                 slist = []
-                if self._may_crawl_celebrity(href, slist):
+                may_crawl = self._may_crawl_celebrity(href, slist)
+                if may_crawl:
                     yield_now = False
                     yield self.cid_to_request(slist[0],
                                               {'item': item, 'cid': slist[0]})
 
                 if len(slist) > 0:
-                    directors[slist[0]] = False
+                    directors[slist[0]] = False if may_crawl else True
 
             for href in response.xpath(path.format('编剧')).getall():
                 slist = []
-                if self._may_crawl_celebrity(href, slist):
+                may_crawl = self._may_crawl_celebrity(href, slist)
+                if may_crawl:
                     yield_now = False
                     yield self.cid_to_request(slist[0],
                                               {'item': item, 'cid': slist[0]})
 
                 if len(slist) > 0:
-                    scriptwriters[slist[0]] = False
+                    scriptwriters[slist[0]] = False if may_crawl else True
 
             for href in response.xpath(path.format('主演')).getall():
                 slist = []
-                if self._may_crawl_celebrity(href, slist):
+                may_crawl = self._may_crawl_celebrity(href, slist)
+                if may_crawl:
                     yield_now = False
                     yield self.cid_to_request(slist[0],
                                               {'item': item, 'cid': slist[0]})
 
                 if len(slist) > 0:
-                    actors[slist[0]] = False
+                    actors[slist[0]] = False if may_crawl else True
 
             # yield here if no need to retrieve celebrity
             if yield_now:
