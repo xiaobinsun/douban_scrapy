@@ -13,6 +13,16 @@ logging.config.dictConfig(LOGGING)
 
 logger = logging.getLogger('douban.' + __name__)
 
+class DoubanSet(set):
+    def __init__(self, it=(), limit=60):
+        super().__init__(it)
+        self.limit = limit
+
+    def add(self, elm):
+        if len(self) > self.limit:
+            return
+        super().add(elm)
+
 class DoubanSpider(scrapy.Spider):
     name = "Douban"
 
@@ -67,7 +77,8 @@ class MTSubjectSpider(DoubanSpider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.seeds = set()
+        self.seeds = DoubanSet()
+        self.newseeds = DoubanSet()
         self.cre = re.compile('^/celebrity/(\d+)/$')
 
     def start_requests(self):
@@ -85,7 +96,7 @@ class MTSubjectSpider(DoubanSpider):
         for url in response.css('.article .title a::attr(href)').getall():
             sid = self.url_to_sid(url)
             if not self._sid_retrieved(sid):
-                self.seeds.add(sid)
+                self.newseeds.add(sid)
                 logger.debug('From startpage, Retrieving subject: %s', sid)
                 yield self.sid_to_request(sid)
 
@@ -93,7 +104,7 @@ class MTSubjectSpider(DoubanSpider):
         for url in response.css('.list-wp .item::attr(href)').getall():
             sid = self.url_to_sid(url)
             if not self._sid_retrieved(sid):
-                self.seeds.add(sid)
+                self.newseeds.add(sid)
                 logger.debug('From startpage, Retrieving subject: %s', sid)
                 yield self.sid_to_request(sid)
 
@@ -216,7 +227,7 @@ class MTSubjectSpider(DoubanSpider):
             logger.debug('subject(%s) already retrieved, skip parsing', sid)
 
         try:
-            self.seeds.remove(sid)
+            self.newseeds.remove(sid)
         except KeyError:
             pass
 
@@ -225,7 +236,7 @@ class MTSubjectSpider(DoubanSpider):
                                         '/*/dd/a/@href').getall():
             sid = self.url_to_sid(url)
             if not self._sid_retrieved(sid):
-                self.seeds.add(sid)
+                self.newseeds.add(sid)
                 yield self.subject_url_to_request(url)
 
     def parse_celebrity(self, response, item, cid):
@@ -273,7 +284,7 @@ class MTSubjectSpider(DoubanSpider):
             yield item
 
     def _sid_retrieved(self, sid):
-        query = 'select * from movie_tv where id = "%s"'
+        query = 'select * from movie_tv where id = "{}"'
         if self.db_cur.execute(query.format(sid)):
             return True
         return False

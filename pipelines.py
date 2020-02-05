@@ -11,7 +11,7 @@ import pymysql
 
 from scrapy.exceptions import DropItem
 
-from .spiders.douban_spider import MTSubjectSpider
+from spiders.douban_spider import MTSubjectSpider
 from .items import Celebrity, MovieTV, Score, Tag
 
 logger = logging.getLogger('douban.' + __name__)
@@ -71,7 +71,7 @@ class MysqlPipeline(object):
                                         item['score_1']))
 
             if len(item['tags']) > 0:
-                query = 'insert into tag values'
+                query = 'insert ignore into tag values'
                 for t in item['tags']:
                     query += '("{}", "{}"),'.format(item['sid'], t)
 
@@ -193,12 +193,17 @@ class MysqlPipeline(object):
         )
         if 'seed' not in tb_names:
             self.db_cur.execute(tbl_seed)
-        elif isinstance(spider, MTSubjectSpider):
+
+        if isinstance(spider, MTSubjectSpider):
             # load seeds
+            logger.debug('Retrieve seeds')
             query = 'select sid from seed where stype = "movie_tv"'
             self.db_cur.execute(query)
             for s in self.db_cur.fetchall():
                 spider.seeds.add(str(s[0]))
+
+            for s in spider.seeds:
+                logger.debug('%s', s)
 
         # check events
         if not self.db_cur.execute('show events like \'eliminate_score\''):
@@ -246,7 +251,7 @@ class MysqlPipeline(object):
             cnt = 0
             try:
                 while cnt < 60:
-                    query += '("{}", "movie_tv"),'.format(spider.seeds.pop())
+                    query += '("{}", "movie_tv"),'.format(spider.newseeds.pop())
                     cnt += 1
             except KeyError:
                 pass
