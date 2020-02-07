@@ -11,8 +11,9 @@ import pymysql
 
 from scrapy.exceptions import DropItem
 
+from douban.settings import DOUBAN_SEEDS_NUMBER
 from spiders.douban_spider import MTSubjectSpider
-from .items import Celebrity, MovieTV, Score, Tag
+from .items import Celebrity, MovieTV, Score, Tag, Seed
 
 logger = logging.getLogger('douban.' + __name__)
 
@@ -97,12 +98,16 @@ class MysqlPipeline(object):
                 logger.warning('drop Tag(%s)', item['sid'])
                 raise DropItem
 
-            query = 'insert into tag values'
+            query = 'insert ignore into tag values'
             for t in item['tags']:
                 query += '("{}", "{}"),'.format(item['sid'], t)
 
             query = query.rstrip(',')
             self.db_cur.execute(query)
+
+        elif isinstance(item, Seed):
+            query = 'insert ignore into seed values("{}", "movie_tv")'
+            self.db_cur.execute(query.format(item['sid']))
 
         self.db_conn.commit()
 
@@ -250,7 +255,7 @@ class MysqlPipeline(object):
             query = 'insert into seed values'
             cnt = 0
             try:
-                while cnt < 60:
+                while cnt < DOUBAN_SEEDS_NUMBER:
                     query += '("{}", "movie_tv"),'.format(spider.newseeds.pop())
                     cnt += 1
             except KeyError:

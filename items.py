@@ -45,3 +45,6 @@ class Score(scrapy.Item):
 class Tag(scrapy.Item):
     sid = scrapy.Field()
     tags = scrapy.Field()
+
+class Seed(scrapy.Item):
+    sid = scrapy.Field()

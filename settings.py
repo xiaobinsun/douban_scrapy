@@ -115,6 +115,7 @@ DOWNLOADER_MIDDLEWARES.update({
 })
 ROTATING_PROXY_LIST_PATH = 'spiders/proxy_list.txt'
 
+DOUBAN_SEEDS_NUMBER = 60
 # logging
 LOGGING = {
     'version': 1,
