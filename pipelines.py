@@ -13,7 +13,7 @@ from scrapy.exceptions import DropItem
 
 from douban.settings import DOUBAN_SEEDS_NUMBER
 from spiders.douban_spider import MTSubjectSpider
-from .items import Celebrity, MovieTV, Score, Tag, Seed
+from .items import Celebrity, MovieTV, Score, Tag
 
 logger = logging.getLogger('douban.' + __name__)
 
@@ -104,10 +104,6 @@ class MysqlPipeline(object):
 
             query = query.rstrip(',')
             self.db_cur.execute(query)
-
-        elif isinstance(item, Seed):
-            query = 'insert ignore into seed values("{}", "movie_tv")'
-            self.db_cur.execute(query.format(item['sid']))
 
         self.db_conn.commit()
 

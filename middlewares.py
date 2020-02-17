@@ -6,7 +6,10 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+from scrapy.exceptions import IgnoreRequest
 from fake_useragent import UserAgent
+
+from spiders.douban_spider import MTSubjectSpider
 
 class RandomUserAgentMiddleware(object):
     def __init__(self, crawler):
@@ -91,6 +94,21 @@ class DoubanDownloaderMiddleware(object):
         # - or return a Request object
         # - or raise IgnoreRequest: process_exception() methods of
         #   installed downloader middleware will be called
+        if isinstance(spider, MTSubjectSpider):
+            if spider.seeding:
+                return None
+
+            try:
+                sid = spider.url_to_sid(request.url)
+                if spider.sid_retrieved(sid):
+                    try:
+                        spider.newseeds.remove(sid)
+                    except KeyError:
+                        pass
+                    raise IgnoreRequest
+            except AttributeError:
+                pass
+
         return None
 
     def process_response(self, request, response, spider):

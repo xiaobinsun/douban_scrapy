@@ -7,7 +7,7 @@ from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
 from scrapy.exceptions import CloseSpider
 
-from douban.items import MovieTV, Celebrity, Score, Tag, Seed
+from douban.items import MovieTV, Celebrity, Score, Tag
 from douban.settings import LOGGING, DOUBAN_SEEDS_NUMBER
 
 logging.config.dictConfig(LOGGING)
@@ -31,12 +31,13 @@ class DoubanSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.re = re.compile(r'^http.*/subject/(\d+)/.*')
 
-    def sid_to_request(self, sid):
+    def sid_to_request(self, sid, parser=None):
         baseurl = 'https://movie.douban.com'
         url = '/'.join([baseurl, 'subject', str(sid)])
         url += '/'
 
-        return scrapy.Request(url=url, callback=self.parse_subject)
+        parser = self.parse_subject if parser is None else parser
+        return scrapy.Request(url=url, callback=parser)
         '''
         return SplashRequest(url=url, callback=self.parse_subject,
                             endpoint='render.html',
@@ -88,6 +89,7 @@ class MTSubjectSpider(DoubanSpider):
         self.seeds = DoubanSet()
         self.newseeds = DoubanSet()
         self.cre = re.compile('^/celebrity/(\d+)/$')
+        self.seeding = False
 
     def start_requests(self):
         '''
@@ -97,9 +99,24 @@ class MTSubjectSpider(DoubanSpider):
                             args={'wait': 0.5})
         '''
 
+        if len(self.seeds) <= 20:
+            # retrieve seeds first
+            logger.debug('Not enough seeds, retrieve seeds now')
+            self.seeding = True
+            query = 'select id from movie_tv'
+            self.db_cur.execute(query)
+            ss = self.db_cur.fetchall()
+            while (len(self.seeds) < DOUBAN_SEEDS_NUMBER):
+                idx = random.randrange(0, len(ss))
+                sid = ss[idx][0]
+                yield self.sid_to_request(sid, parser=self.parse_seed)
+
+        self.seeding = False
+        logger.debug('Got enough seeds, retrieve subject now')
         for sid in self.seeds:
             if not self.sid_retrieved(sid):
                 logger.debug('From seed, Retrieving subject: %s', sid)
+                self.newseeds.add(sid)
                 yield self.sid_to_request(sid)
 
     def parse_startpage(self, response):
@@ -118,6 +135,20 @@ class MTSubjectSpider(DoubanSpider):
                 self.newseeds.add(sid)
                 logger.debug('From startpage, Retrieving subject: %s', sid)
                 yield self.sid_to_request(sid)
+
+    def parse_seed(self, response):
+        if response.status == 403:
+            logger.error('403 received, abort')
+            raise CloseSpider('403 received')
+
+        for url in response.xpath('//div[@class="recommendations-bd"]'
+                                  '/*/dd/a/@href').getall():
+            sid = self.url_to_sid(url)
+            if not self.sid_retrieved(sid):
+                logger.debug('From recommendations: '
+                             'subject(%s) not retrieved, add to seeds', sid)
+                self.seeds.add(sid)
+                self.newseeds.add(sid)
 
     def parse_subject(self, response):
         if response.status == 403:
@@ -296,7 +327,6 @@ class MTSubjectSpider(DoubanSpider):
                             item['sid'])
             yield item
 
-    
     def _may_crawl_celebrity(self, href, out):
         if not href.startswith('/celebrity'):
             return False
@@ -332,36 +362,6 @@ class TagSpider(DoubanSpider):
         tl = [t for t in
                 response.xpath('//div[@class="tags-body"]/a/text()').getall()]
         yield Tag(sid=sid, tags=tl)
-
-class SeedSpider(DoubanSpider):
-    name = 'SeedSpider'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cnt = 0
-
-    def start_requests(self):
-        query = 'select id from movie_tv'
-        self.db_cur.execute(query)
-        ss = self.db_cur.fetchall()
-        while (self.cnt < DOUBAN_SEEDS_NUMBER):
-            idx = random.randrange(0, len(ss))
-            sid = ss[idx][0]
-            yield self.sid_to_request(sid)
-
-    def parse_subject(self, response):
-        if response.status == 403:
-            logger.error('403 received, abort')
-            raise CloseSpider('403 received')
-
-        for url in response.xpath('//div[@class="recommendations-bd"]'
-                                        '/*/dd/a/@href').getall():
-            sid = self.url_to_sid(url)
-            if not self.sid_retrieved(sid):
-                logger.debug('From recommendations: '
-                            'subject(%s) not retrieved, add to seeds', sid)
-                self.cnt += 1
-                yield Seed(sid=sid)
 
 
 class ScoreSpider(DoubanSpider):
