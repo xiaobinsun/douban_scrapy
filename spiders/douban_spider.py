@@ -2,6 +2,7 @@ import logging
 import re
 import random
 import threading
+import copy
 import scrapy
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 from scrapy_splash import SplashRequest
@@ -112,11 +113,11 @@ class MTSubjectSpider(DoubanSpider):
                 yield self.sid_to_request(sid, parser=self.parse_seed)
 
         self.seeding = False
+        self.newseeds =  copy.deepcopy(self.seeds)
         logger.debug('Got enough seeds, retrieve subject now')
         for sid in self.seeds:
             if not self.sid_retrieved(sid):
                 logger.debug('From seed, Retrieving subject: %s', sid)
-                self.newseeds.add(sid)
                 yield self.sid_to_request(sid)
 
     def parse_startpage(self, response):
